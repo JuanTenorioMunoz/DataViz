@@ -69,14 +69,13 @@ export default function ProductDashboard() {
     "Producto C": item["Dev C"]
   }));
 
-    type ProductName = "Producto A" | "Producto B" | "Producto C";
+  type ProductName = "Producto A" | "Producto B" | "Producto C";
 
-    const [selectedProducts, setSelectedProducts] = useState<Record<ProductName, boolean>>({
+  const [selectedProducts, setSelectedProducts] = useState<Record<ProductName, boolean>>({
     "Producto A": true,
     "Producto B": true,
     "Producto C": true
-    });
-
+  });
 
   // Manejar cambios en la selección de productos
   const handleProductToggle = (product: ProductName) => {
@@ -100,21 +99,21 @@ export default function ProductDashboard() {
         <div className="flex gap-3">
           <button 
             onClick={() => handleProductToggle("Producto A")}
-            className={`px-3 py-1 rounded-full text-white ${selectedProducts["Producto A"] ? `bg-[${colors.primary}]` : "bg-gray-400"}`}
+            className="px-3 py-1 rounded-full text-white"
             style={{ backgroundColor: selectedProducts["Producto A"] ? colors.primary : "#9CA3AF" }}
           >
             Producto A
           </button>
           <button 
             onClick={() => handleProductToggle("Producto B")}
-            className={`px-3 py-1 rounded-full text-white ${selectedProducts["Producto B"] ? `bg-[${colors.secondary}]` : "bg-gray-400"}`}
+            className="px-3 py-1 rounded-full text-white"
             style={{ backgroundColor: selectedProducts["Producto B"] ? colors.secondary : "#9CA3AF" }}
           >
             Producto B
           </button>
           <button 
             onClick={() => handleProductToggle("Producto C")}
-            className={`px-3 py-1 rounded-full text-white ${selectedProducts["Producto C"] ? `bg-[${colors.tertiary}]` : "bg-gray-400"}`}
+            className="px-3 py-1 rounded-full text-white"
             style={{ backgroundColor: selectedProducts["Producto C"] ? colors.tertiary : "#9CA3AF" }}
           >
             Producto C
@@ -235,13 +234,13 @@ export default function ProductDashboard() {
                   domain={[-8, 8]}
                   tick={{ fontSize: 12 }}
                 />
-                <Tooltip formatter={(value) => { if (typeof value === 'number') {
-                    return value.toFixed(2) + '%';  }   
-                    return value;}} />
+                <Tooltip formatter={(value) => { 
+                  if (typeof value === 'number') {
+                    return value.toFixed(2) + '%';  
+                  }   
+                  return value;
+                }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                
-                {/* Línea de referencia en cero */}
-                <CartesianGrid y={0} stroke="#000" strokeWidth={1} />
                 
                 {selectedProducts["Producto A"] && (
                   <Bar 
@@ -280,7 +279,7 @@ export default function ProductDashboard() {
           <p className="text-sm text-gray-500 mb-4">Comparativa de metas anuales vs ventas acumuladas</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={resumenProductos.filter(p => selectedProducts[p.product])}>
+              <BarChart data={resumenProductos.filter(p => selectedProducts[p.producto as ProductName])}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="producto" tick={{ fontSize: 12 }} />
                 <YAxis 
@@ -291,7 +290,7 @@ export default function ProductDashboard() {
                   formatter={(value, name) => {
                     if (name === "metaTotal") return [`${value}K USD`, "Meta Anual"];
                     if (name === "ventasTotal") return [`${value}K USD`, "Ventas Anuales"];
-                    if (name === "desviacion") return [`${value.toFixed(2)}%`, "Desviación"];
+                    if (name === "desviacion") return [`${typeof value === 'number' ? value.toFixed(2) : value}%`, "Desviación"];
                     return [value, name];
                   }}
                 />  
@@ -313,7 +312,7 @@ export default function ProductDashboard() {
       {/* KPIs y Métricas Clave */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
         {resumenProductos.map((prod) => (
-          selectedProducts[prod.producto] && (
+          selectedProducts[prod.producto as ProductName] && (
             <div 
               key={prod.producto} 
               className="bg-white p-4 rounded-lg shadow"
