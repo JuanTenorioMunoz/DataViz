@@ -125,106 +125,49 @@ export default function ProductDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8" >
         {/* Gráfico 1: Metas vs Ventas Reales */}
         <div className="bg-white p-4 rounded-lg shadow">
-          <h2 className="text-xl font-bold text-gray-800 mb-1">Tendencia de Ventas: Meta vs Real</h2>
-          <p className="text-sm text-gray-500 mb-4">Comparativa mensual de objetivos y resultados</p>
-          <div className="h-64" style={{ width: '100%', height: '400px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} style={{ width: '100%', height: '100%' }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis 
-                  label={{ 
-                    value: 'USD (K)', 
-                    angle: -90, 
-                    position: 'insideLeft', 
-                    style: { textAnchor: 'middle', fontSize: 12 } 
-                  }} 
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip formatter={(value) => [`${value}K USD`, null]} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                
-                {selectedProducts["Producto A"] && (
-                  <>
-                    <Line 
-                      type="monotone" 
-                      dataKey="Meta A" 
-                      name="Meta A" 
-                      stroke={colors.primaryDark} 
-                      strokeWidth={2}
-                      strokeDasharray="5 5" 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Real A" 
-                      name="Real A" 
-                      stroke={colors.primary} 
-                      strokeWidth={2} 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                  </>
-                )}
-                
-                {selectedProducts["Producto B"] && (
-                  <>
-                    <Line 
-                      type="monotone" 
-                      dataKey="Meta B" 
-                      name="Meta B" 
-                      stroke={colors.secondaryDark} 
-                      strokeWidth={2}
-                      strokeDasharray="5 5" 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Real B" 
-                      name="Real B" 
-                      stroke={colors.secondary} 
-                      strokeWidth={2} 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                  </>
-                )}
-                
-                {selectedProducts["Producto C"] && (
-                  <>
-                    <Line 
-                      type="monotone" 
-                      dataKey="Meta C" 
-                      name="Meta C" 
-                      stroke={colors.tertiaryDark} 
-                      strokeWidth={2}
-                      strokeDasharray="5 5" 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Real C" 
-                      name="Real C" 
-                      stroke={colors.tertiary} 
-                      strokeWidth={2} 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                  </>
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      <h2 className="text-xl font-bold text-gray-800 mb-1">Tendencia de Ventas: Meta vs Real</h2>
+      <p className="text-sm text-gray-500 mb-4">Comparativa mensual de objetivos y resultados</p>
+      <div style={{ width: '100%', height: '400px' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+            <YAxis 
+              label={{ value: 'USD (K)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 12 } }} 
+              tick={{ fontSize: 12 }}
+            />
+            <Tooltip formatter={(value) => [`${value}K USD`, null]} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            
+            <Line 
+              type="monotone" 
+              dataKey="Meta A" 
+              name="Meta A" 
+              stroke="#3366cc" 
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              dot={{ r: 3 }}
+              activeDot={{ r: 5 }}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="Real A" 
+              name="Real A" 
+              stroke="#33cc99" 
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              activeDot={{ r: 5 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
 
         {/* Gráfico 2: Desviación porcentual */}
         <div className="bg-white p-4 rounded-lg shadow">
           <h2 className="text-xl font-bold text-gray-800 mb-1">Desviación Porcentual vs Meta</h2>
           <p className="text-sm text-gray-500 mb-4">Rendimiento mensual por encima/debajo del objetivo</p>
-          <div className="h-64" style={{ width: '100%', height: '400px' }}>
+          <div  style={{ width: '100%', height: '400px' }}>
             <ResponsiveContainer width="100%" height="100%" >
               <ComposedChart data={dataDesviacion}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
