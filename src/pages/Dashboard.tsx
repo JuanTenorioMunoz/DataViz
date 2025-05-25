@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { LineChart, BarChart, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import './Dashboard.css'
+import * as XLSX from "xlsx";
 export default function ProductDashboard() {
   // Paleta de colores corporativos y derivados
   const colors = {
@@ -18,21 +19,7 @@ export default function ProductDashboard() {
   };
 
   // Datos mensuales de ventas
-  const data = [
-    { mes: "Ene", "Meta A": 10, "Real A": 9.8, "Meta B": 8, "Real B": 7.5, "Meta C": 10.5, "Real C": 10, "Dev A": -2.00, "Dev B": -6.25, "Dev C": -4.76 },
-    { mes: "Feb", "Meta A": 11, "Real A": 11.5, "Meta B": 8.5, "Real B": 8.2, "Meta C": 11, "Real C": 10.8, "Dev A": 4.55, "Dev B": -3.53, "Dev C": -1.82 },
-    { mes: "Mar", "Meta A": 12, "Real A": 12.3, "Meta B": 9, "Real B": 8.9, "Meta C": 11.5, "Real C": 11, "Dev A": 2.50, "Dev B": -1.11, "Dev C": -4.35 },
-    { mes: "Abr", "Meta A": 10.5, "Real A": 10, "Meta B": 8.5, "Real B": 8.2, "Meta C": 11, "Real C": 10.5, "Dev A": -4.76, "Dev B": -3.53, "Dev C": -4.55 },
-    { mes: "May", "Meta A": 13, "Real A": 13.5, "Meta B": 9, "Real B": 8.7, "Meta C": 12, "Real C": 11.8, "Dev A": 3.85, "Dev B": -3.33, "Dev C": -1.67 },
-    { mes: "Jun", "Meta A": 14, "Real A": 14.5, "Meta B": 9.5, "Real B": 9, "Meta C": 13, "Real C": 12.8, "Dev A": 3.57, "Dev B": -5.26, "Dev C": -1.54 },
-    { mes: "Jul", "Meta A": 12, "Real A": 12, "Meta B": 8.8, "Real B": 8.5, "Meta C": 11, "Real C": 10.5, "Dev A": 0.00, "Dev B": -3.41, "Dev C": -4.55 },
-    { mes: "Ago", "Meta A": 13.5, "Real A": 13, "Meta B": 9.5, "Real B": 9.2, "Meta C": 12.5, "Real C": 12.2, "Dev A": -3.70, "Dev B": -3.16, "Dev C": -2.40 },
-    { mes: "Sep", "Meta A": 11.5, "Real A": 11, "Meta B": 9, "Real B": 8.7, "Meta C": 11, "Real C": 10.5, "Dev A": -4.35, "Dev B": -3.33, "Dev C": -4.55 },
-    { mes: "Oct", "Meta A": 12.5, "Real A": 12.3, "Meta B": 9.2, "Real B": 9, "Meta C": 12, "Real C": 11.5, "Dev A": -1.60, "Dev B": -2.17, "Dev C": -4.17 },
-    { mes: "Nov", "Meta A": 10, "Real A": 9.7, "Meta B": 8.5, "Real B": 8.3, "Meta C": 10.5, "Real C": 10.2, "Dev A": -3.00, "Dev B": -2.35, "Dev C": -2.86 },
-    { mes: "Dic", "Meta A": 15, "Real A": 14.8, "Meta B": 10.5, "Real B": 10, "Meta C": 14, "Real C": 13.5, "Dev A": -1.33, "Dev B": -4.76, "Dev C": -3.57 }
-  ];
-
+  const [data, setData] = useState<any[]>([]);
   // Datos sumarios por producto para el año completo
   const resumenProductos = [
     { 
@@ -84,6 +71,22 @@ export default function ProductDashboard() {
       [product]: !selectedProducts[product]
     });
   };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+  
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const parsedData = XLSX.utils.sheet_to_json(ws);
+        setData(parsedData as any[]);
+      };
+      reader.readAsBinaryString(file);
+    };
   
   return (
     <div className="font-sans bg-gray-50 p-6 rounded-lg">
@@ -91,6 +94,16 @@ export default function ProductDashboard() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboard de Rendimiento de Productos</h1>
         <p className="text-lg text-gray-600">Análisis comparativo de metas y ventas reales</p>
+      </div>
+
+      <div className="mb-6">
+        <label className="block mb-2 text-sm font-medium text-gray-700">Cargar archivo Excel:</label>
+        <input 
+          type="file" 
+          accept=".xlsx, .xls" 
+          onChange={handleFileUpload}
+          className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-white focus:outline-none"
+        />
       </div>
 
       {/* Filtros de Productos */}
