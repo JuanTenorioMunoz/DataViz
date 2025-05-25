@@ -2,14 +2,14 @@ import { useState } from "react";
 import { LineChart, BarChart, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import './Dashboard.css'
 import * as XLSX from "xlsx";
+
 export default function ProductDashboard() {
-  // Paleta de colores corporativos y derivados
+    
   const colors = {
     primary: "#00a89c",    // Verde-azulado
     secondary: "#9654e5",  // Púrpura
     tertiary: "#ff8800",   // Naranja
     
-    // Colores análogos y complementarios
     primaryLight: "#4fbdb5",
     primaryDark: "#007a71",
     secondaryLight: "#b78aed",
@@ -18,7 +18,7 @@ export default function ProductDashboard() {
     tertiaryDark: "#cc6a00",
   };
 
-  // Datos mensuales de ventas
+
   const [data, setData] = useState<any[]>([]);
   // Datos sumarios por producto para el año completo
   const resumenProductos = [
@@ -57,12 +57,28 @@ export default function ProductDashboard() {
   }));
 
   type ProductName = "Producto A" | "Producto B" | "Producto C";
+  type MetaSums = {[key: string]: number;};
 
   const [selectedProducts, setSelectedProducts] = useState({
     "Producto A": true,
     "Producto B": true,
     "Producto C": true
   });
+
+  const [metaSums, setMetaSums] = useState<MetaSums>({});
+
+  const calculateMetaSums = (data: Record<string, any>[], metaKeys: string[]): MetaSums => {
+    const sums: MetaSums = {};
+
+    metaKeys.forEach((key) => {
+      sums[key] = data.reduce((acc, row) => {
+        const value = Number(row[key]);
+        return acc + (isNaN(value) ? 0 : value);
+      }, 0);
+    });
+
+    return sums;
+  };
 
   // Manejar cambios en la selección de productos
   const handleProductToggle = (product: ProductName) => {
@@ -72,21 +88,26 @@ export default function ProductDashboard() {
     });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-  
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const parsedData = XLSX.utils.sheet_to_json(ws);
-        setData(parsedData as any[]);
-      };
-      reader.readAsBinaryString(file);
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target?.result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
+
+      setData(jsonData);
+      const sums = calculateMetaSums(jsonData, ['Meta A', 'Meta B', 'Meta C']);
+      setMetaSums(sums);
     };
+
+    reader.readAsArrayBuffer(file);
+  };
   
   return (
     <div className="font-sans bg-gray-50 p-6 rounded-lg">
