@@ -86,7 +86,7 @@ export default function ProductDashboard() {
   };
 
   return (
-    <div className="font-sans bg-gray-50 p-6 rounded-lg min-h-screen">
+    <div className="font-sans bg-gray-50 p-6 rounded-lg">
       {/* Encabezado del Dashboard */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboard de Rendimiento de Productos</h1>
@@ -94,33 +94,27 @@ export default function ProductDashboard() {
       </div>
 
       {/* Filtros de Productos */}
-      <div className="mb-6 flex flex-wrap gap-3 items-center">
-        <span className="font-semibold text-gray-700">Filtrar productos:</span>
+      <div className="mb-6 flex flex-wrap gap-3">
+        <span className="font-semibold text-gray-700 self-center">Filtrar productos:</span>
         <div className="flex gap-3">
           <button 
             onClick={() => handleProductToggle("Producto A")}
-            className={`px-4 py-2 rounded-full text-white font-medium transition-all duration-200 hover:shadow-md ${
-              selectedProducts["Producto A"] ? 'shadow-md' : 'bg-gray-400 hover:bg-gray-500'
-            }`}
-            style={{ backgroundColor: selectedProducts["Producto A"] ? colors.primary : undefined }}
+            className="px-3 py-1 rounded-full text-white"
+            style={{ backgroundColor: selectedProducts["Producto A"] ? colors.primary : "#9CA3AF" }}
           >
             Producto A
           </button>
           <button 
             onClick={() => handleProductToggle("Producto B")}
-            className={`px-4 py-2 rounded-full text-white font-medium transition-all duration-200 hover:shadow-md ${
-              selectedProducts["Producto B"] ? 'shadow-md' : 'bg-gray-400 hover:bg-gray-500'
-            }`}
-            style={{ backgroundColor: selectedProducts["Producto B"] ? colors.secondary : undefined }}
+            className="px-3 py-1 rounded-full text-white"
+            style={{ backgroundColor: selectedProducts["Producto B"] ? colors.secondary : "#9CA3AF" }}
           >
             Producto B
           </button>
           <button 
             onClick={() => handleProductToggle("Producto C")}
-            className={`px-4 py-2 rounded-full text-white font-medium transition-all duration-200 hover:shadow-md ${
-              selectedProducts["Producto C"] ? 'shadow-md' : 'bg-gray-400 hover:bg-gray-500'
-            }`}
-            style={{ backgroundColor: selectedProducts["Producto C"] ? colors.tertiary : undefined }}
+            className="px-3 py-1 rounded-full text-white"
+            style={{ backgroundColor: selectedProducts["Producto C"] ? colors.tertiary : "#9CA3AF" }}
           >
             Producto C
           </button>
@@ -128,14 +122,14 @@ export default function ProductDashboard() {
       </div>
 
       {/* Grid de visualizaciones */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8" >
         {/* Gráfico 1: Metas vs Ventas Reales */}
-        <div className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-200">
+        <div className="bg-white p-4 rounded-lg shadow">
           <h2 className="text-xl font-bold text-gray-800 mb-1">Tendencia de Ventas: Meta vs Real</h2>
           <p className="text-sm text-gray-500 mb-4">Comparativa mensual de objetivos y resultados</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data}>
+              <LineChart data={data} style={{ width: '100%', height: '100%' }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
                 <YAxis 
@@ -227,11 +221,11 @@ export default function ProductDashboard() {
         </div>
 
         {/* Gráfico 2: Desviación porcentual */}
-        <div className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-200">
+        <div className="bg-white p-4 rounded-lg shadow">
           <h2 className="text-xl font-bold text-gray-800 mb-1">Desviación Porcentual vs Meta</h2>
           <p className="text-sm text-gray-500 mb-4">Rendimiento mensual por encima/debajo del objetivo</p>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100px" >
               <ComposedChart data={dataDesviacion}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
@@ -280,12 +274,12 @@ export default function ProductDashboard() {
         </div>
 
         {/* Gráfico 3: Resumen Anual por Producto */}
-        <div className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-200 lg:col-span-2">
+        <div className="bg-white p-4 rounded-lg shadow lg:col-span-2" >
           <h2 className="text-xl font-bold text-gray-800 mb-1">Desempeño Anual por Producto</h2>
           <p className="text-sm text-gray-500 mb-4">Comparativa de metas anuales vs ventas acumuladas</p>
-          <div className="h-64">
+          <div className="h-64" style={{ width: '100%', height: '400px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={resumenProductos.filter(p => selectedProducts[p.producto as ProductName])}>
+              <BarChart data={resumenProductos.filter(p => selectedProducts[p.producto as ProductName]) }>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="producto" tick={{ fontSize: 12 }} />
                 <YAxis 
@@ -316,42 +310,33 @@ export default function ProductDashboard() {
       </div>
 
       {/* KPIs y Métricas Clave */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
         {resumenProductos.map((prod) => (
           selectedProducts[prod.producto as ProductName] && (
             <div 
               key={prod.producto} 
-              className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
+              className="bg-white p-4 rounded-lg shadow"
               style={{ borderLeft: `4px solid ${prod.color}` }}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-800">{prod.producto}</h3>
-                <div 
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: prod.color }}
-                ></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Meta anual</p>
-                  <p className="text-xl font-bold text-gray-800">{prod.metaTotal}K</p>
-                  <p className="text-xs text-gray-400">USD</p>
+              <h3 className="text-lg font-bold text-gray-800">{prod.producto}</h3>
+              <div className="grid grid-cols-2 gap-y-2 mt-3">
+                <div>
+                  <p className="text-xs text-gray-500">Meta anual</p>
+                  <p className="text-lg font-semibold">{prod.metaTotal}K USD</p>
                 </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Ventas reales</p>
-                  <p className="text-xl font-bold text-gray-800">{prod.ventasTotal}K</p>
-                  <p className="text-xs text-gray-400">USD</p>
+                <div>
+                  <p className="text-xs text-gray-500">Ventas reales</p>
+                  <p className="text-lg font-semibold">{prod.ventasTotal}K USD</p>
                 </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Desviación</p>
-                  <p className={`text-xl font-bold ${prod.desviacion >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {prod.desviacion >= 0 ? '+' : ''}{prod.desviacion.toFixed(2)}%
+                <div>
+                  <p className="text-xs text-gray-500">Desviación</p>
+                  <p className={`text-lg font-semibold ${prod.desviacion >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {prod.desviacion.toFixed(2)}%
                   </p>
                 </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Meses positivos</p>
-                  <p className="text-xl font-bold text-gray-800">{prod.mesesPositivos}</p>
-                  <p className="text-xs text-gray-400">de 12</p>
+                <div>
+                  <p className="text-xs text-gray-500">Meses positivos</p>
+                  <p className="text-lg font-semibold">{prod.mesesPositivos} / 12</p>
                 </div>
               </div>
             </div>
