@@ -1,10 +1,49 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LineChart, BarChart, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import './Dashboard.css'
 import * as XLSX from "xlsx";
 
 export default function ProductDashboard() {
-    
+  
+  type Registro = {
+  producto: string;
+  mes: string;
+  meta: number;
+  ventas: number;
+};
+
+const transformarDatos = (jsonData: any[]): Registro[] => {
+  const productos = ['A', 'B', 'C'];
+  const registros: Registro[] = [];
+
+  jsonData.forEach((fila) => {
+    productos.forEach((producto) => {
+      registros.push({
+        producto,
+        mes: fila.mes,
+        meta: Number(fila[`Meta ${producto}`]) || 0,
+        ventas: Number(fila[`Real ${producto}`]) || 0,
+      });
+    });
+  });
+
+  return registros;
+  };
+
+  type ResumenProducto = {
+    producto: string;
+    metaTotal: number;
+    ventasTotal: number;
+    desviacion: number;
+    mesesPositivos: number;
+    color: string;
+  };
+
+  const getColor = (index: number) => {
+  const palette = [colors.primary, colors.secondary, colors.tertiary];
+  return palette[index % palette.length];
+  };
+
   const colors = {
     primary: "#00a89c",    // Verde-azulado
     secondary: "#9654e5",  // Púrpura
@@ -20,35 +59,36 @@ export default function ProductDashboard() {
 
 
   const [data, setData] = useState<any[]>([]);
-  // Datos sumarios por producto para el año completo
-  const resumenProductos = [
-    { 
-      producto: "Producto A", 
-      metaTotal: 145, 
-      ventasTotal: 144.4, 
-      desviacion: -0.41, 
-      mesesPositivos: 4,
-      color: colors.primary
-    },
-    { 
-      producto: "Producto B", 
-      metaTotal: 108, 
-      ventasTotal: 104.2, 
-      desviacion: -3.52, 
-      mesesPositivos: 0,
-      color: colors.secondary
-    },
-    { 
-      producto: "Producto C", 
-      metaTotal: 140, 
-      ventasTotal: 135.3, 
-      desviacion: -3.36, 
-      mesesPositivos: 0,
-      color: colors.tertiary
-    }
-  ];
+  const [resumenProductos, setResumenProductos] = useState<any[]>([]);
+  
+  const calcularResumenProductos = (datos: Registro[]): ResumenProducto[] => {
+  const agrupado: { [producto: string]: Registro[] } = {};
 
-  // Datos de desviación mensual por producto
+  datos.forEach((item) => {
+    if (!agrupado[item.producto]) {
+      agrupado[item.producto] = [];
+    }
+    agrupado[item.producto].push(item);
+  });
+
+  return Object.entries(agrupado).map(([producto, registros], index) => {
+    const metaTotal = registros.reduce((acc, r) => acc + r.meta, 0);
+    const ventasTotal = registros.reduce((acc, r) => acc + r.ventas, 0);
+    const desviacion = metaTotal > 0 ? +((ventasTotal - metaTotal) / metaTotal * 100).toFixed(2) : 0;
+    const mesesPositivos = registros.filter((r) => r.ventas >= r.meta).length;
+
+    return {
+      producto: `Producto ${producto}`, // Fixed: Map to match selectedProducts keys
+      metaTotal: +metaTotal.toFixed(2),
+      ventasTotal: +ventasTotal.toFixed(2),
+      desviacion,
+      mesesPositivos,
+      color: getColor(index),
+    };
+  });
+};
+
+  
   const dataDesviacion = data.map(item => ({
     mes: item.mes,
     "Producto A": item["Dev A"],
@@ -95,20 +135,32 @@ export default function ProductDashboard() {
     const reader = new FileReader();
 
     reader.onload = (e) => {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
-
-      setData(jsonData);
-      const sums = calculateMetaSums(jsonData, ['Meta A', 'Meta B', 'Meta C']);
-      setMetaSums(sums);
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
+        
+        setData(jsonData);
+        const registrosTransformados = transformarDatos(jsonData);
+        const resumen = calcularResumenProductos(registrosTransformados);
+        setResumenProductos(resumen);
+        const sums = calculateMetaSums(jsonData, ['Meta A', 'Meta B', 'Meta C']);
+        setMetaSums(sums);
+      } catch (error) {
+        console.error("Error processing file:", error);
+      }
     };
 
     reader.readAsArrayBuffer(file);
   };
-  
+
+  // Filter resumenProductos based on selected products
+  const filteredResumenProductos = resumenProductos.filter(p => 
+    selectedProducts[p.producto as ProductName]
+  );
+
   return (
     <div className="font-sans bg-gray-50 p-6 rounded-lg">
       {/* Encabezado del Dashboard */}
@@ -307,13 +359,13 @@ export default function ProductDashboard() {
           </div>
         </div>
 
-        {/* Gráfico 3: Resumen Anual por Producto */}
+        {/* Gráfico 3: Resumen Anual por Producto - FIXED */}
         <div className="bg-white p-4 rounded-lg shadow lg:col-span-2" >
           <h2 className="text-xl font-bold text-gray-800 mb-1">Desempeño Anual por Producto</h2>
           <p className="text-sm text-gray-500 mb-4">Comparativa de metas anuales vs ventas acumuladas</p>
           <div className="h-64" style={{ width: '100%', height: '400px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={resumenProductos.filter(p => selectedProducts[p.producto as ProductName]) }>
+              <BarChart data={filteredResumenProductos}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="producto" tick={{ fontSize: 12 }} />
                 <YAxis 
@@ -343,38 +395,36 @@ export default function ProductDashboard() {
         </div>
       </div>
 
-      {/* KPIs y Métricas Clave */}
+      {/* KPIs y Métricas Clave - FIXED */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        {resumenProductos.map((prod) => (
-          selectedProducts[prod.producto as ProductName] && (
-            <div 
-              key={prod.producto} 
-              className="bg-white p-4 rounded-lg shadow"
-              style={{ borderLeft: `4px solid ${prod.color}` }}
-            >
-              <h3 className="text-lg font-bold text-gray-800">{prod.producto}</h3>
-              <div className="grid grid-cols-2 gap-y-2 mt-3">
-                <div>
-                  <p className="text-xs text-gray-500">Meta anual</p>
-                  <p className="text-lg font-semibold">{prod.metaTotal}K USD</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Ventas reales</p>
-                  <p className="text-lg font-semibold">{prod.ventasTotal}K USD</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Desviación</p>
-                  <p className={`text-lg font-semibold ${prod.desviacion >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {prod.desviacion.toFixed(2)}%
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Meses positivos</p>
-                  <p className="text-lg font-semibold">{prod.mesesPositivos} / 12</p>
-                </div>
+        {filteredResumenProductos.map((prod) => (
+          <div 
+            key={prod.producto} 
+            className="bg-white p-4 rounded-lg shadow"
+            style={{ borderLeft: `4px solid ${prod.color}` }}
+          >
+            <h3 className="text-lg font-bold text-gray-800">{prod.producto}</h3>
+            <div className="grid grid-cols-2 gap-y-2 mt-3">
+              <div>
+                <p className="text-xs text-gray-500">Meta anual</p>
+                <p className="text-lg font-semibold">{prod.metaTotal}K USD</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Ventas reales</p>
+                <p className="text-lg font-semibold">{prod.ventasTotal}K USD</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Desviación</p>
+                <p className={`text-lg font-semibold ${prod.desviacion >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {prod.desviacion.toFixed(2)}%
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Meses positivos</p>
+                <p className="text-lg font-semibold">{prod.mesesPositivos} / 4</p>
               </div>
             </div>
-          )
+          </div>
         ))}
       </div>
     </div>
