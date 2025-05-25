@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { LineChart, BarChart, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-
+import './Dashboard.css'
 export default function ProductDashboard() {
   // Paleta de colores corporativos y derivados
   const colors = {
@@ -127,7 +127,7 @@ export default function ProductDashboard() {
         <div className="bg-white p-4 rounded-lg shadow">
           <h2 className="text-xl font-bold text-gray-800 mb-1">Tendencia de Ventas: Meta vs Real</h2>
           <p className="text-sm text-gray-500 mb-4">Comparativa mensual de objetivos y resultados</p>
-          <div className="h-64">
+          <div className="h-64" style={{ width: '100%', height: '400px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} style={{ width: '100%', height: '100%' }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -224,8 +224,8 @@ export default function ProductDashboard() {
         <div className="bg-white p-4 rounded-lg shadow">
           <h2 className="text-xl font-bold text-gray-800 mb-1">Desviación Porcentual vs Meta</h2>
           <p className="text-sm text-gray-500 mb-4">Rendimiento mensual por encima/debajo del objetivo</p>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100px" >
+          <div className="h-64" style={{ width: '100%', height: '400px' }}>
+            <ResponsiveContainer width="100%" height="100%" >
               <ComposedChart data={dataDesviacion}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
