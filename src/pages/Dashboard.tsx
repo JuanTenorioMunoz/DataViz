@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { LineChart, BarChart, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
 
@@ -79,7 +79,7 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
     const totalMeses = registros.length;
 
     return {
-      producto: `Producto ${producto}`, // Fixed: Map to match selectedProducts keys
+      producto: `Producto ${producto}`, 
       metaTotal: +metaTotal.toFixed(2),
       ventasTotal: +ventasTotal.toFixed(2),
       desviacion,
@@ -169,6 +169,8 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
         setResumenProductos(resumen);
         const sums = calculateMetaSums(jsonData, ['Meta A', 'Meta B', 'Meta C']);
         setMetaSums(sums);
+        console.log(metaSums)
+        console.log('Data structure:', data);
       } catch (error) {
         console.error("Error processing file:", error);
         alert("Error al procesar el archivo. Asegúrate de que sea un archivo Excel válido con la estructura correcta.");
