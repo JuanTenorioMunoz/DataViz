@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { LineChart, BarChart, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import './Dashboard.css'
 import * as XLSX from "xlsx";
 
 export default function ProductDashboard() {
@@ -36,6 +35,7 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
     ventasTotal: number;
     desviacion: number;
     mesesPositivos: number;
+    totalMeses: number;
     color: string;
   };
 
@@ -76,6 +76,7 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
     const ventasTotal = registros.reduce((acc, r) => acc + r.ventas, 0);
     const desviacion = metaTotal > 0 ? +((ventasTotal - metaTotal) / metaTotal * 100).toFixed(2) : 0;
     const mesesPositivos = registros.filter((r) => r.ventas >= r.meta).length;
+    const totalMeses = registros.length;
 
     return {
       producto: `Producto ${producto}`, // Fixed: Map to match selectedProducts keys
@@ -83,18 +84,26 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
       ventasTotal: +ventasTotal.toFixed(2),
       desviacion,
       mesesPositivos,
+      totalMeses,
       color: getColor(index),
     };
   });
 };
 
   
-  const dataDesviacion = data.map(item => ({
-    mes: item.mes,
-    "Producto A": item["Dev A"],
-    "Producto B": item["Dev B"],
-    "Producto C": item["Dev C"]
-  }));
+  // Calculate deviations from the data
+  const dataDesviacion = data.map(item => {
+    const calcDeviation = (real: number, meta: number) => {
+      return meta > 0 ? ((real - meta) / meta * 100) : 0;
+    };
+
+    return {
+      mes: item.mes,
+      "Producto A": calcDeviation(Number(item["Real A"]) || 0, Number(item["Meta A"]) || 0),
+      "Producto B": calcDeviation(Number(item["Real B"]) || 0, Number(item["Meta B"]) || 0),
+      "Producto C": calcDeviation(Number(item["Real C"]) || 0, Number(item["Meta C"]) || 0)
+    };
+  });
 
   type ProductName = "Producto A" | "Producto B" | "Producto C";
   type MetaSums = {[key: string]: number;};
@@ -142,6 +151,18 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
         
+        // Validate required columns
+        if (jsonData.length > 0) {
+          const requiredColumns = ['mes', 'Meta A', 'Real A', 'Meta B', 'Real B', 'Meta C', 'Real C'];
+          const firstRow = jsonData[0];
+          const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+          
+          if (missingColumns.length > 0) {
+            alert(`Faltan las siguientes columnas en el archivo Excel: ${missingColumns.join(', ')}`);
+            return;
+          }
+        }
+        
         setData(jsonData);
         const registrosTransformados = transformarDatos(jsonData);
         const resumen = calcularResumenProductos(registrosTransformados);
@@ -150,6 +171,7 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
         setMetaSums(sums);
       } catch (error) {
         console.error("Error processing file:", error);
+        alert("Error al procesar el archivo. Asegúrate de que sea un archivo Excel válido con la estructura correcta.");
       }
     };
 
@@ -162,45 +184,109 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
   );
 
   return (
-    <div className="font-sans bg-gray-50 p-6 rounded-lg">
+    <div style={{ 
+      fontFamily: 'system-ui, -apple-system, sans-serif', 
+      backgroundColor: '#f9fafb', 
+      padding: '24px', 
+      borderRadius: '8px' 
+    }}>
       {/* Encabezado del Dashboard */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboard de Rendimiento de Productos</h1>
-        <p className="text-lg text-gray-600">Análisis comparativo de metas y ventas reales</p>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ 
+          fontSize: '30px', 
+          fontWeight: 'bold', 
+          color: '#1f2937', 
+          marginBottom: '8px' 
+        }}>
+          Dashboard de Rendimiento de Productos
+        </h1>
+        <p style={{ 
+          fontSize: '18px', 
+          color: '#4b5563' 
+        }}>
+          Análisis comparativo de metas y ventas reales
+        </p>
       </div>
 
-      <div className="mb-6">
-        <label className="block mb-2 text-sm font-medium text-gray-700">Cargar archivo Excel:</label>
+      <div style={{ marginBottom: '24px' }}>
+        <label style={{ 
+          display: 'block', 
+          marginBottom: '8px', 
+          fontSize: '14px', 
+          fontWeight: '500', 
+          color: '#374151' 
+        }}>
+          Cargar archivo Excel:
+        </label>
         <input 
           type="file" 
           accept=".xlsx, .xls" 
           onChange={handleFileUpload}
-          className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-white focus:outline-none"
+          style={{
+            display: 'block',
+            width: '100%',
+            fontSize: '14px',
+            color: '#111827',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            backgroundColor: 'white',
+            padding: '8px 12px'
+          }}
         />
       </div>
 
       {/* Filtros de Productos */}
-      <div className="mb-6 flex flex-wrap gap-3">
-        <span className="font-semibold text-gray-700 self-center">Filtrar productos:</span>
-        <div className="flex gap-3">
+      <div style={{ 
+        marginBottom: '24px', 
+        display: 'flex', 
+        flexWrap: 'wrap', 
+        gap: '12px' 
+      }}>
+        <span style={{ 
+          fontWeight: '600', 
+          color: '#374151', 
+          alignSelf: 'center' 
+        }}>
+          Filtrar productos:
+        </span>
+        <div style={{ display: 'flex', gap: '12px' }}>
           <button 
             onClick={() => handleProductToggle("Producto A")}
-            className="px-3 py-1 rounded-full text-white"
-            style={{ backgroundColor: selectedProducts["Producto A"] ? colors.primary : "#9CA3AF" }}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: selectedProducts["Producto A"] ? colors.primary : "#9CA3AF"
+            }}
           >
             Producto A
           </button>
           <button 
             onClick={() => handleProductToggle("Producto B")}
-            className="px-3 py-1 rounded-full text-white"
-            style={{ backgroundColor: selectedProducts["Producto B"] ? colors.secondary : "#9CA3AF" }}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: selectedProducts["Producto B"] ? colors.secondary : "#9CA3AF"
+            }}
           >
             Producto B
           </button>
           <button 
             onClick={() => handleProductToggle("Producto C")}
-            className="px-3 py-1 rounded-full text-white"
-            style={{ backgroundColor: selectedProducts["Producto C"] ? colors.tertiary : "#9CA3AF" }}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: selectedProducts["Producto C"] ? colors.tertiary : "#9CA3AF"
+            }}
           >
             Producto C
           </button>
@@ -208,109 +294,180 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
       </div>
 
       {/* Grid de visualizaciones */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8" >
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', 
+        gap: '32px' 
+      }}>
         {/* Gráfico 1: Metas vs Ventas Reales */}
-        <div className="bg-white p-4 rounded-lg shadow" >
-          <h2 className="text-xl font-bold text-gray-800 mb-1">Tendencia de Ventas: Meta vs Real</h2>
-          <p className="text-sm text-gray-500 mb-4">Comparativa mensual de objetivos y resultados</p>
-          <div className="h-64" style={{ width: '100%', height: '400px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} style={{ width: '100%', height: '100%' }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis 
-                  label={{ 
-                    value: 'USD (K)', 
-                    angle: -90, 
-                    position: 'insideLeft', 
-                    style: { textAnchor: 'middle', fontSize: 12 } 
-                  }} 
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip formatter={(value) => [`${value}K USD`, null]} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                
-                {selectedProducts["Producto A"] && (
-                  <>
-                    <Line 
-                      type="monotone" 
-                      dataKey="Meta A" 
-                      name="Meta A" 
-                      stroke={colors.primaryDark} 
-                      strokeWidth={2}
-                      strokeDasharray="5 5" 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Real A" 
-                      name="Real A" 
-                      stroke={colors.primary} 
-                      strokeWidth={2} 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                  </>
-                )}
-                
-                {selectedProducts["Producto B"] && (
-                  <>
-                    <Line 
-                      type="monotone" 
-                      dataKey="Meta B" 
-                      name="Meta B" 
-                      stroke={colors.secondaryDark} 
-                      strokeWidth={2}
-                      strokeDasharray="5 5" 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Real B" 
-                      name="Real B" 
-                      stroke={colors.secondary} 
-                      strokeWidth={2} 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                  </>
-                )}
-                
-                {selectedProducts["Producto C"] && (
-                  <>
-                    <Line 
-                      type="monotone" 
-                      dataKey="Meta C" 
-                      name="Meta C" 
-                      stroke={colors.tertiaryDark} 
-                      strokeWidth={2}
-                      strokeDasharray="5 5" 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="Real C" 
-                      name="Real C" 
-                      stroke={colors.tertiary} 
-                      strokeWidth={2} 
-                      dot={{ r: 3 }} 
-                      activeDot={{ r: 5 }}
-                    />
-                  </>
-                )}
-              </LineChart>
-            </ResponsiveContainer>
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '16px', 
+          borderRadius: '8px', 
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' 
+        }}>
+          <h2 style={{ 
+            fontSize: '20px', 
+            fontWeight: 'bold', 
+            color: '#1f2937', 
+            marginBottom: '4px' 
+          }}>
+            Tendencia de Ventas: Meta vs Real
+          </h2>
+          <p style={{ 
+            fontSize: '14px', 
+            color: '#6b7280', 
+            marginBottom: '16px' 
+          }}>
+            Comparativa mensual de objetivos y resultados
+          </p>
+          <div style={{ width: '100%', height: '400px', minHeight: '400px' }}>
+            {data && data.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart 
+                  data={data} 
+                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="mes" 
+                    tick={{ fontSize: 12 }} 
+                    height={60}
+                  />
+                  <YAxis 
+                    label={{ 
+                      value: 'USD (K)', 
+                      angle: -90, 
+                      position: 'insideLeft', 
+                      style: { textAnchor: 'middle', fontSize: 12 } 
+                    }} 
+                    tick={{ fontSize: 12 }}
+                    width={80}
+                  />
+                  <Tooltip 
+                    formatter={(value, name) => [`${value}K USD`, name]} 
+                    labelFormatter={(label) => `Mes: ${label}`}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  
+                  {selectedProducts["Producto A"] && (
+                    <>
+                      <Line 
+                        type="monotone" 
+                        dataKey="Meta A" 
+                        name="Meta A" 
+                        stroke={colors.primaryDark} 
+                        strokeWidth={2}
+                        strokeDasharray="5 5" 
+                        dot={{ r: 3, fill: colors.primaryDark }} 
+                        activeDot={{ r: 5, fill: colors.primaryDark }}
+                        connectNulls={false}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="Real A" 
+                        name="Real A" 
+                        stroke={colors.primary} 
+                        strokeWidth={2} 
+                        dot={{ r: 3, fill: colors.primary }} 
+                        activeDot={{ r: 5, fill: colors.primary }}
+                        connectNulls={false}
+                      />
+                    </>
+                  )}
+                  
+                  {selectedProducts["Producto B"] && (
+                    <>
+                      <Line 
+                        type="monotone" 
+                        dataKey="Meta B" 
+                        name="Meta B" 
+                        stroke={colors.secondaryDark} 
+                        strokeWidth={2}
+                        strokeDasharray="5 5" 
+                        dot={{ r: 3, fill: colors.secondaryDark }} 
+                        activeDot={{ r: 5, fill: colors.secondaryDark }}
+                        connectNulls={false}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="Real B" 
+                        name="Real B" 
+                        stroke={colors.secondary} 
+                        strokeWidth={2} 
+                        dot={{ r: 3, fill: colors.secondary }} 
+                        activeDot={{ r: 5, fill: colors.secondary }}
+                        connectNulls={false}
+                      />
+                    </>
+                  )}
+                  
+                  {selectedProducts["Producto C"] && (
+                    <>
+                      <Line 
+                        type="monotone" 
+                        dataKey="Meta C" 
+                        name="Meta C" 
+                        stroke={colors.tertiaryDark} 
+                        strokeWidth={2}
+                        strokeDasharray="5 5" 
+                        dot={{ r: 3, fill: colors.tertiaryDark }} 
+                        activeDot={{ r: 5, fill: colors.tertiaryDark }}
+                        connectNulls={false}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="Real C" 
+                        name="Real C" 
+                        stroke={colors.tertiary} 
+                        strokeWidth={2} 
+                        dot={{ r: 3, fill: colors.tertiary }} 
+                        activeDot={{ r: 5, fill: colors.tertiary }}
+                        connectNulls={false}
+                      />
+                    </>
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6b7280',
+                fontSize: '14px'
+              }}>
+                No hay datos para mostrar. Carga un archivo Excel.
+              </div>
+            )}
           </div>
         </div> 
 
         {/* Gráfico 2: Desviación porcentual */}
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h2 className="text-xl font-bold text-gray-800 mb-1">Desviación Porcentual vs Meta</h2>
-          <p className="text-sm text-gray-500 mb-4">Rendimiento mensual por encima/debajo del objetivo</p>
-          <div  style={{ width: '100%', height: '400px' }}>
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '16px', 
+          borderRadius: '8px', 
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' 
+        }}>
+          <h2 style={{ 
+            fontSize: '20px', 
+            fontWeight: 'bold', 
+            color: '#1f2937', 
+            marginBottom: '4px' 
+          }}>
+            Desviación Porcentual vs Meta
+          </h2>
+          <p style={{ 
+            fontSize: '14px', 
+            color: '#6b7280', 
+            marginBottom: '16px' 
+          }}>
+            Rendimiento mensual por encima/debajo del objetivo
+          </p>
+          <div style={{ width: '100%', height: '400px' }}>
             <ResponsiveContainer width="100%" height="100%" >
               <ComposedChart data={dataDesviacion}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -360,10 +517,29 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
         </div>
 
         {/* Gráfico 3: Resumen Anual por Producto - FIXED */}
-        <div className="bg-white p-4 rounded-lg shadow lg:col-span-2" >
-          <h2 className="text-xl font-bold text-gray-800 mb-1">Desempeño Anual por Producto</h2>
-          <p className="text-sm text-gray-500 mb-4">Comparativa de metas anuales vs ventas acumuladas</p>
-          <div className="h-64" style={{ width: '100%', height: '400px' }}>
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '16px', 
+          borderRadius: '8px', 
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          gridColumn: '1 / -1'
+        }}>
+          <h2 style={{ 
+            fontSize: '20px', 
+            fontWeight: 'bold', 
+            color: '#1f2937', 
+            marginBottom: '4px' 
+          }}>
+            Desempeño Anual por Producto
+          </h2>
+          <p style={{ 
+            fontSize: '14px', 
+            color: '#6b7280', 
+            marginBottom: '16px' 
+          }}>
+            Comparativa de metas anuales vs ventas acumuladas
+          </p>
+          <div style={{ width: '100%', height: '400px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={filteredResumenProductos}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -396,32 +572,92 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
       </div>
 
       {/* KPIs y Métricas Clave - FIXED */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div style={{ 
+        marginTop: '32px', 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+        gap: '16px' 
+      }}>
         {filteredResumenProductos.map((prod) => (
           <div 
             key={prod.producto} 
-            className="bg-white p-4 rounded-lg shadow"
-            style={{ borderLeft: `4px solid ${prod.color}` }}
+            style={{
+              backgroundColor: 'white',
+              padding: '16px',
+              borderRadius: '8px',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+              borderLeft: `4px solid ${prod.color}`
+            }}
           >
-            <h3 className="text-lg font-bold text-gray-800">{prod.producto}</h3>
-            <div className="grid grid-cols-2 gap-y-2 mt-3">
+            <h3 style={{ 
+              fontSize: '18px', 
+              fontWeight: 'bold', 
+              color: '#1f2937' 
+            }}>
+              {prod.producto}
+            </h3>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr', 
+              gap: '8px 0', 
+              marginTop: '12px' 
+            }}>
               <div>
-                <p className="text-xs text-gray-500">Meta anual</p>
-                <p className="text-lg font-semibold">{prod.metaTotal}K USD</p>
+                <p style={{ 
+                  fontSize: '12px', 
+                  color: '#6b7280' 
+                }}>
+                  Meta anual
+                </p>
+                <p style={{ 
+                  fontSize: '18px', 
+                  fontWeight: '600' 
+                }}>
+                  {prod.metaTotal}K USD
+                </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Ventas reales</p>
-                <p className="text-lg font-semibold">{prod.ventasTotal}K USD</p>
+                <p style={{ 
+                  fontSize: '12px', 
+                  color: '#6b7280' 
+                }}>
+                  Ventas reales
+                </p>
+                <p style={{ 
+                  fontSize: '18px', 
+                  fontWeight: '600' 
+                }}>
+                  {prod.ventasTotal}K USD
+                </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Desviación</p>
-                <p className={`text-lg font-semibold ${prod.desviacion >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <p style={{ 
+                  fontSize: '12px', 
+                  color: '#6b7280' 
+                }}>
+                  Desviación
+                </p>
+                <p style={{
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: prod.desviacion >= 0 ? '#059669' : '#dc2626'
+                }}>
                   {prod.desviacion.toFixed(2)}%
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Meses positivos</p>
-                <p className="text-lg font-semibold">{prod.mesesPositivos} / 4</p>
+                <p style={{ 
+                  fontSize: '12px', 
+                  color: '#6b7280' 
+                }}>
+                  Meses positivos
+                </p>
+                <p style={{ 
+                  fontSize: '18px', 
+                  fontWeight: '600' 
+                }}>
+                  {prod.mesesPositivos} / {prod.totalMeses}
+                </p>
               </div>
             </div>
           </div>
