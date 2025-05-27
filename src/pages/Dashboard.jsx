@@ -2,46 +2,29 @@ import { useState } from "react";
 import { LineChart, BarChart, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
 
-export default function ProductDashboard() {
+function ProductDashboard() {
   
-  type Registro = {
-  producto: string;
-  mes: string;
-  meta: number;
-  ventas: number;
-};
+  const transformarDatos = (jsonData) => {
+    const productos = ['A', 'B', 'C'];
+    const registros = [];
 
-const transformarDatos = (jsonData: any[]): Registro[] => {
-  const productos = ['A', 'B', 'C'];
-  const registros: Registro[] = [];
-
-  jsonData.forEach((fila) => {
-    productos.forEach((producto) => {
-      registros.push({
-        producto,
-        mes: fila.mes,
-        meta: Number(fila[`Meta ${producto}`]) || 0,
-        ventas: Number(fila[`Real ${producto}`]) || 0,
+    jsonData.forEach((fila) => {
+      productos.forEach((producto) => {
+        registros.push({
+          producto,
+          mes: fila.mes,
+          meta: Number(fila[`Meta ${producto}`]) || 0,
+          ventas: Number(fila[`Real ${producto}`]) || 0,
+        });
       });
     });
-  });
 
-  return registros;
+    return registros;
   };
 
-  type ResumenProducto = {
-    producto: string;
-    metaTotal: number;
-    ventasTotal: number;
-    desviacion: number;
-    mesesPositivos: number;
-    totalMeses: number;
-    color: string;
-  };
-
-  const getColor = (index: number) => {
-  const palette = [colors.primary, colors.secondary, colors.tertiary];
-  return palette[index % palette.length];
+  const getColor = (index) => {
+    const palette = [colors.primary, colors.secondary, colors.tertiary];
+    return palette[index % palette.length];
   };
 
   const colors = {
@@ -57,43 +40,41 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
     tertiaryDark: "#cc6a00",
   };
 
-
-  const [data, setData] = useState<any[]>([]);
-  const [resumenProductos, setResumenProductos] = useState<any[]>([]);
+  const [data, setData] = useState([]);
+  const [resumenProductos, setResumenProductos] = useState([]);
   
-  const calcularResumenProductos = (datos: Registro[]): ResumenProducto[] => {
-  const agrupado: { [producto: string]: Registro[] } = {};
+  const calcularResumenProductos = (datos) => {
+    const agrupado = {};
 
-  datos.forEach((item) => {
-    if (!agrupado[item.producto]) {
-      agrupado[item.producto] = [];
-    }
-    agrupado[item.producto].push(item);
-  });
+    datos.forEach((item) => {
+      if (!agrupado[item.producto]) {
+        agrupado[item.producto] = [];
+      }
+      agrupado[item.producto].push(item);
+    });
 
-  return Object.entries(agrupado).map(([producto, registros], index) => {
-    const metaTotal = registros.reduce((acc, r) => acc + r.meta, 0);
-    const ventasTotal = registros.reduce((acc, r) => acc + r.ventas, 0);
-    const desviacion = metaTotal > 0 ? +((ventasTotal - metaTotal) / metaTotal * 100).toFixed(2) : 0;
-    const mesesPositivos = registros.filter((r) => r.ventas >= r.meta).length;
-    const totalMeses = registros.length;
+    return Object.entries(agrupado).map(([producto, registros], index) => {
+      const metaTotal = registros.reduce((acc, r) => acc + r.meta, 0);
+      const ventasTotal = registros.reduce((acc, r) => acc + r.ventas, 0);
+      const desviacion = metaTotal > 0 ? +((ventasTotal - metaTotal) / metaTotal * 100).toFixed(2) : 0;
+      const mesesPositivos = registros.filter((r) => r.ventas >= r.meta).length;
+      const totalMeses = registros.length;
 
-    return {
-      producto: `Producto ${producto}`, 
-      metaTotal: +metaTotal.toFixed(2),
-      ventasTotal: +ventasTotal.toFixed(2),
-      desviacion,
-      mesesPositivos,
-      totalMeses,
-      color: getColor(index),
-    };
-  });
-};
-
+      return {
+        producto: `Producto ${producto}`, 
+        metaTotal: +metaTotal.toFixed(2),
+        ventasTotal: +ventasTotal.toFixed(2),
+        desviacion,
+        mesesPositivos,
+        totalMeses,
+        color: getColor(index),
+      };
+    });
+  };
   
   // Calculate deviations from the data
   const dataDesviacion = data.map(item => {
-    const calcDeviation = (real: number, meta: number) => {
+    const calcDeviation = (real, meta) => {
       return meta > 0 ? ((real - meta) / meta * 100) : 0;
     };
 
@@ -105,19 +86,16 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
     };
   });
 
-  type ProductName = "Producto A" | "Producto B" | "Producto C";
-  type MetaSums = {[key: string]: number;};
-
   const [selectedProducts, setSelectedProducts] = useState({
     "Producto A": true,
     "Producto B": true,
     "Producto C": true
   });
 
-  const [metaSums, setMetaSums] = useState<MetaSums>({});
+  const [metaSums, setMetaSums] = useState({});
 
-  const calculateMetaSums = (data: Record<string, any>[], metaKeys: string[]): MetaSums => {
-    const sums: MetaSums = {};
+  const calculateMetaSums = (data, metaKeys) => {
+    const sums = {};
 
     metaKeys.forEach((key) => {
       sums[key] = data.reduce((acc, row) => {
@@ -130,14 +108,14 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
   };
 
   // Manejar cambios en la selección de productos
-  const handleProductToggle = (product: ProductName) => {
+  const handleProductToggle = (product) => {
     setSelectedProducts({
       ...selectedProducts,
       [product]: !selectedProducts[product]
     });
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -145,11 +123,11 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
 
     reader.onload = (e) => {
       try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const data = new Uint8Array(e.target?.result);
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
         
         // Validate required columns
         if (jsonData.length > 0) {
@@ -182,7 +160,7 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
 
   // Filter resumenProductos based on selected products
   const filteredResumenProductos = resumenProductos.filter(p => 
-    selectedProducts[p.producto as ProductName]
+    selectedProducts[p.producto]
   );
 
   return (
@@ -324,126 +302,97 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
             Comparativa mensual de objetivos y resultados
           </p>
           <div style={{ width: '100%', height: '400px', minHeight: '400px' }}>
-            {data && data.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart 
-                  data={data} 
-                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="mes" 
-                    tick={{ fontSize: 12 }} 
-                    height={60}
-                  />
-                  <YAxis 
-                    label={{ 
-                      value: 'USD (K)', 
-                      angle: -90, 
-                      position: 'insideLeft', 
-                      style: { textAnchor: 'middle', fontSize: 12 } 
-                    }} 
-                    tick={{ fontSize: 12 }}
-                    width={80}
-                  />
-                  <Tooltip 
-                    formatter={(value, name) => [`${value}K USD`, name]} 
-                    labelFormatter={(label) => `Mes: ${label}`}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  
-                  {selectedProducts["Producto A"] && (
-                    <>
-                      <Line 
-                        type="monotone" 
-                        dataKey="Meta A" 
-                        name="Meta A" 
-                        stroke={colors.primaryDark} 
-                        strokeWidth={2}
-                        strokeDasharray="5 5" 
-                        dot={{ r: 3, fill: colors.primaryDark }} 
-                        activeDot={{ r: 5, fill: colors.primaryDark }}
-                        connectNulls={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="Real A" 
-                        name="Real A" 
-                        stroke={colors.primary} 
-                        strokeWidth={2} 
-                        dot={{ r: 3, fill: colors.primary }} 
-                        activeDot={{ r: 5, fill: colors.primary }}
-                        connectNulls={false}
-                      />
-                    </>
-                  )}
-                  
-                  {selectedProducts["Producto B"] && (
-                    <>
-                      <Line 
-                        type="monotone" 
-                        dataKey="Meta B" 
-                        name="Meta B" 
-                        stroke={colors.secondaryDark} 
-                        strokeWidth={2}
-                        strokeDasharray="5 5" 
-                        dot={{ r: 3, fill: colors.secondaryDark }} 
-                        activeDot={{ r: 5, fill: colors.secondaryDark }}
-                        connectNulls={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="Real B" 
-                        name="Real B" 
-                        stroke={colors.secondary} 
-                        strokeWidth={2} 
-                        dot={{ r: 3, fill: colors.secondary }} 
-                        activeDot={{ r: 5, fill: colors.secondary }}
-                        connectNulls={false}
-                      />
-                    </>
-                  )}
-                  
-                  {selectedProducts["Producto C"] && (
-                    <>
-                      <Line 
-                        type="monotone" 
-                        dataKey="Meta C" 
-                        name="Meta C" 
-                        stroke={colors.tertiaryDark} 
-                        strokeWidth={2}
-                        strokeDasharray="5 5" 
-                        dot={{ r: 3, fill: colors.tertiaryDark }} 
-                        activeDot={{ r: 5, fill: colors.tertiaryDark }}
-                        connectNulls={false}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="Real C" 
-                        name="Real C" 
-                        stroke={colors.tertiary} 
-                        strokeWidth={2} 
-                        dot={{ r: 3, fill: colors.tertiary }} 
-                        activeDot={{ r: 5, fill: colors.tertiary }}
-                        connectNulls={false}
-                      />
-                    </>
-                  )}
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div style={{
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#6b7280',
-                fontSize: '14px'
-              }}>
-                No hay datos para mostrar. Carga un archivo Excel.
-              </div>
-            )}
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart 
+                data={data} 
+                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="mes" 
+                  tick={{ fontSize: 12 }} 
+                  height={60}
+                />
+                <YAxis 
+                  label={{ 
+                    value: 'USD (K)', 
+                    angle: -90, 
+                    position: 'insideLeft', 
+                    style: { textAnchor: 'middle', fontSize: 12 } 
+                  }} 
+                  tick={{ fontSize: 12 }}
+                  width={80}
+                />
+                <Tooltip 
+                  formatter={(value, name) => [`${value}K USD`, name]} 
+                  labelFormatter={(label) => `Mes: ${label}`}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                
+                {/* Product A Lines */}
+                <Line 
+                  type="monotone" 
+                  dataKey="Meta A" 
+                  name="Meta A" 
+                  stroke={colors.primaryDark} 
+                  strokeWidth={2}
+                  strokeDasharray="5 5" 
+                  dot={{ r: 3, fill: colors.primaryDark }} 
+                  activeDot={{ r: 5, fill: colors.primaryDark }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="Real A" 
+                  name="Real A" 
+                  stroke={colors.primary} 
+                  strokeWidth={2} 
+                  dot={{ r: 3, fill: colors.primary }} 
+                  activeDot={{ r: 5, fill: colors.primary }}
+                />
+                
+                {/* Product B Lines */}
+                <Line 
+                  type="monotone" 
+                  dataKey="Meta B" 
+                  name="Meta B" 
+                  stroke={colors.secondaryDark} 
+                  strokeWidth={2}
+                  strokeDasharray="5 5" 
+                  dot={{ r: 3, fill: colors.secondaryDark }} 
+                  activeDot={{ r: 5, fill: colors.secondaryDark }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="Real B" 
+                  name="Real B" 
+                  stroke={colors.secondary} 
+                  strokeWidth={2} 
+                  dot={{ r: 3, fill: colors.secondary }} 
+                  activeDot={{ r: 5, fill: colors.secondary }}
+                />
+                
+                {/* Product C Lines */}
+                <Line 
+                  type="monotone" 
+                  dataKey="Meta C" 
+                  name="Meta C" 
+                  stroke={colors.tertiaryDark} 
+                  strokeWidth={2}
+                  strokeDasharray="5 5" 
+                  dot={{ r: 3, fill: colors.tertiaryDark }} 
+                  activeDot={{ r: 5, fill: colors.tertiaryDark }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="Real C" 
+                  name="Real C" 
+                  stroke={colors.tertiary} 
+                  strokeWidth={2} 
+                  dot={{ r: 3, fill: colors.tertiary }} 
+                  activeDot={{ r: 5, fill: colors.tertiary }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </div> 
 
@@ -668,3 +617,5 @@ const transformarDatos = (jsonData: any[]): Registro[] => {
     </div>
   );
 }
+
+export default ProductDashboard;
