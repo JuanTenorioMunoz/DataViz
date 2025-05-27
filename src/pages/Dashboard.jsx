@@ -1,15 +1,56 @@
 import { useState } from "react";
 import { LineChart, BarChart, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
+import React from "react";
 
 function ProductDashboard() {
   
-  const transformarDatos = (jsonData) => {
-    const productos = ['A', 'B', 'C'];
+  const [data, setData] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [selectedProducts, setSelectedProducts] = useState({});
+  const [resumenProductos, setResumenProductos] = useState([]);
+
+  const colors = {
+    palette: [
+      "#00a89c", "#9654e5", "#ff8800", "#e74c3c", "#3498db", 
+      "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c", "#34495e",
+      "#e67e22", "#95a5a6", "#16a085", "#27ae60", "#2980b9",
+      "#8e44ad", "#f1c40f", "#e74c3c", "#ecf0f1", "#bdc3c7"
+    ]
+  };
+
+  const getColor = (index) => {
+    return colors.palette[index % colors.palette.length];
+  };
+
+  const getDarkColor = (index) => {
+    const baseColor = colors.palette[index % colors.palette.length];
+    // Simple way to darken color - in real app you might use a color manipulation library
+    return baseColor.replace('#', '#').slice(0, 7);
+  };
+
+  // Extract products dynamically from column headers
+  const extractProductsFromData = (jsonData) => {
+    if (!jsonData || jsonData.length === 0) return [];
+    
+    const firstRow = jsonData[0];
+    const productSet = new Set();
+    
+    Object.keys(firstRow).forEach(key => {
+      if (key.startsWith('Meta ') || key.startsWith('Real ')) {
+        const productName = key.replace('Meta ', '').replace('Real ', '');
+        productSet.add(productName);
+      }
+    });
+    
+    return Array.from(productSet).sort();
+  };
+
+  const transformarDatos = (jsonData, productList) => {
     const registros = [];
 
     jsonData.forEach((fila) => {
-      productos.forEach((producto) => {
+      productList.forEach((producto) => {
         registros.push({
           producto,
           mes: fila.mes,
@@ -22,28 +63,7 @@ function ProductDashboard() {
     return registros;
   };
 
-  const getColor = (index) => {
-    const palette = [colors.primary, colors.secondary, colors.tertiary];
-    return palette[index % palette.length];
-  };
-
-  const colors = {
-    primary: "#00a89c",    // Verde-azulado
-    secondary: "#9654e5",  // Púrpura
-    tertiary: "#ff8800",   // Naranja
-    
-    primaryLight: "#4fbdb5",
-    primaryDark: "#007a71",
-    secondaryLight: "#b78aed",
-    secondaryDark: "#6e3eba",
-    tertiaryLight: "#ffaa4d",
-    tertiaryDark: "#cc6a00",
-  };
-
-  const [data, setData] = useState([]);
-  const [resumenProductos, setResumenProductos] = useState([]);
-  
-  const calcularResumenProductos = (datos) => {
+  const calcularResumenProductos = (datos, productList) => {
     const agrupado = {};
 
     datos.forEach((item) => {
@@ -53,7 +73,8 @@ function ProductDashboard() {
       agrupado[item.producto].push(item);
     });
 
-    return Object.entries(agrupado).map(([producto, registros], index) => {
+    return productList.map((producto, index) => {
+      const registros = agrupado[producto] || [];
       const metaTotal = registros.reduce((acc, r) => acc + r.meta, 0);
       const ventasTotal = registros.reduce((acc, r) => acc + r.ventas, 0);
       const desviacion = metaTotal > 0 ? +((ventasTotal - metaTotal) / metaTotal * 100).toFixed(2) : 0;
@@ -72,42 +93,22 @@ function ProductDashboard() {
     });
   };
   
-  // Calculate deviations from the data
-  const dataDesviacion = data.map(item => {
-    const calcDeviation = (real, meta) => {
-      return meta > 0 ? ((real - meta) / meta * 100) : 0;
-    };
-
-    return {
-      mes: item.mes,
-      "Producto A": calcDeviation(Number(item["Real A"]) || 0, Number(item["Meta A"]) || 0),
-      "Producto B": calcDeviation(Number(item["Real B"]) || 0, Number(item["Meta B"]) || 0),
-      "Producto C": calcDeviation(Number(item["Real C"]) || 0, Number(item["Meta C"]) || 0)
-    };
-  });
-
-  const [selectedProducts, setSelectedProducts] = useState({
-    "Producto A": true,
-    "Producto B": true,
-    "Producto C": true
-  });
-
-  const [metaSums, setMetaSums] = useState({});
-
-  const calculateMetaSums = (data, metaKeys) => {
-    const sums = {};
-
-    metaKeys.forEach((key) => {
-      sums[key] = data.reduce((acc, row) => {
-        const value = Number(row[key]);
-        return acc + (isNaN(value) ? 0 : value);
-      }, 0);
+  // Calculate deviations dynamically
+  const calculateDeviations = (data, productList) => {
+    return data.map(item => {
+      const result = { mes: item.mes };
+      
+      productList.forEach(product => {
+        const real = Number(item[`Real ${product}`]) || 0;
+        const meta = Number(item[`Meta ${product}`]) || 0;
+        const deviation = meta > 0 ? ((real - meta) / meta * 100) : 0;
+        result[`Producto ${product}`] = deviation;
+      });
+      
+      return result;
     });
-
-    return sums;
   };
 
-  // Manejar cambios en la selección de productos
   const handleProductToggle = (product) => {
     setSelectedProducts({
       ...selectedProducts,
@@ -129,26 +130,51 @@ function ProductDashboard() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
         
-        // Validate required columns
-        if (jsonData.length > 0) {
-          const requiredColumns = ['mes', 'Meta A', 'Real A', 'Meta B', 'Real B', 'Meta C', 'Real C'];
-          const firstRow = jsonData[0];
-          const missingColumns = requiredColumns.filter(col => !(col in firstRow));
-          
-          if (missingColumns.length > 0) {
-            alert(`Faltan las siguientes columnas en el archivo Excel: ${missingColumns.join(', ')}`);
-            return;
-          }
+        if (jsonData.length === 0) {
+          alert("El archivo Excel está vacío.");
+          return;
         }
+
+
+        const detectedProducts = extractProductsFromData(jsonData);
         
+        if (detectedProducts.length === 0) {
+          alert("No se encontraron productos válidos. Asegúrate de que las columnas sigan el formato 'Meta [Producto]' y 'Real [Producto]'.");
+          return;
+        }
+
+        const firstRow = jsonData[0];
+        const missingColumns = [];
+        detectedProducts.forEach(product => {
+          if (!(`Meta ${product}` in firstRow)) missingColumns.push(`Meta ${product}`);
+          if (!(`Real ${product}` in firstRow)) missingColumns.push(`Real ${product}`);
+        });
+
+        if (missingColumns.length > 0) {
+          alert(`Faltan las siguientes columnas en el archivo Excel: ${missingColumns.join(', ')}`);
+          return;
+        }
+
+        if (!('mes' in firstRow)) {
+          alert("Falta la columna 'mes' en el archivo Excel.");
+          return;
+        }
+
+        console.log(`Detected ${detectedProducts.length} products:`, detectedProducts);
+
         setData(jsonData);
-        const registrosTransformados = transformarDatos(jsonData);
-        const resumen = calcularResumenProductos(registrosTransformados);
+        setProducts(detectedProducts);
+        
+        const initialSelection = {};
+        detectedProducts.forEach(product => {
+          initialSelection[`Producto ${product}`] = true;
+        });
+        setSelectedProducts(initialSelection);
+
+        const registrosTransformados = transformarDatos(jsonData, detectedProducts);
+        const resumen = calcularResumenProductos(registrosTransformados, detectedProducts);
         setResumenProductos(resumen);
-        const sums = calculateMetaSums(jsonData, ['Meta A', 'Meta B', 'Meta C']);
-        setMetaSums(sums);
-        console.log(metaSums)
-        console.log('Data structure:', data);
+
       } catch (error) {
         console.error("Error processing file:", error);
         alert("Error al procesar el archivo. Asegúrate de que sea un archivo Excel válido con la estructura correcta.");
@@ -157,6 +183,11 @@ function ProductDashboard() {
 
     reader.readAsArrayBuffer(file);
   };
+
+  // Calculate deviations from current data and products
+  const dataDesviacion = data.length > 0 && products.length > 0 
+    ? calculateDeviations(data, products)
+    : [];
 
   // Filter resumenProductos based on selected products
   const filteredResumenProductos = resumenProductos.filter(p => 
@@ -170,7 +201,7 @@ function ProductDashboard() {
       padding: '24px', 
       borderRadius: '8px' 
     }}>
-      {/* Encabezado del Dashboard */}
+      {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ 
           fontSize: '30px', 
@@ -188,6 +219,7 @@ function ProductDashboard() {
         </p>
       </div>
 
+      {/* File Upload */}
       <div style={{ marginBottom: '24px' }}>
         <label style={{ 
           display: 'block', 
@@ -214,406 +246,382 @@ function ProductDashboard() {
             padding: '8px 12px'
           }}
         />
-      </div>
-
-      {/* Filtros de Productos */}
-      <div style={{ 
-        marginBottom: '24px', 
-        display: 'flex', 
-        flexWrap: 'wrap', 
-        gap: '12px' 
-      }}>
-        <span style={{ 
-          fontWeight: '600', 
-          color: '#374151', 
-          alignSelf: 'center' 
-        }}>
-          Filtrar productos:
-        </span>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button 
-            onClick={() => handleProductToggle("Producto A")}
-            style={{
-              padding: '4px 12px',
-              borderRadius: '9999px',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: selectedProducts["Producto A"] ? colors.primary : "#9CA3AF"
-            }}
-          >
-            Producto A
-          </button>
-          <button 
-            onClick={() => handleProductToggle("Producto B")}
-            style={{
-              padding: '4px 12px',
-              borderRadius: '9999px',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: selectedProducts["Producto B"] ? colors.secondary : "#9CA3AF"
-            }}
-          >
-            Producto B
-          </button>
-          <button 
-            onClick={() => handleProductToggle("Producto C")}
-            style={{
-              padding: '4px 12px',
-              borderRadius: '9999px',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: selectedProducts["Producto C"] ? colors.tertiary : "#9CA3AF"
-            }}
-          >
-            Producto C
-          </button>
-        </div>
-      </div>
-
-      {/* Grid de visualizaciones */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', 
-        gap: '32px' 
-      }}>
-        {/* Gráfico 1: Metas vs Ventas Reales */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          padding: '16px', 
-          borderRadius: '8px', 
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' 
-        }}>
-          <h2 style={{ 
-            fontSize: '20px', 
-            fontWeight: 'bold', 
-            color: '#1f2937', 
-            marginBottom: '4px' 
-          }}>
-            Tendencia de Ventas: Meta vs Real
-          </h2>
+        {products.length > 0 && (
           <p style={{ 
-            fontSize: '14px', 
+            fontSize: '12px', 
             color: '#6b7280', 
-            marginBottom: '16px' 
+            marginTop: '4px' 
           }}>
-            Comparativa mensual de objetivos y resultados
+            Productos detectados: {products.join(', ')} ({products.length} total)
           </p>
-          <div style={{ width: '100%', height: '400px', minHeight: '400px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart 
-                data={data} 
-                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+        )}
+      </div>
+
+      {/* Product Filters */}
+      {products.length > 0 && (
+        <div style={{ 
+          marginBottom: '24px', 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: '12px' 
+        }}>
+          <span style={{ 
+            fontWeight: '600', 
+            color: '#374151', 
+            alignSelf: 'center' 
+          }}>
+            Filtrar productos:
+          </span>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {products.map((product, index) => (
+              <button 
+                key={product}
+                onClick={() => handleProductToggle(`Producto ${product}`)}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '9999px',
+                  color: 'white',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  backgroundColor: selectedProducts[`Producto ${product}`] ? getColor(index) : "#9CA3AF"
+                }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="mes" 
-                  tick={{ fontSize: 12 }} 
-                  height={60}
-                />
-                <YAxis 
-                  label={{ 
-                    value: 'USD (K)', 
-                    angle: -90, 
-                    position: 'insideLeft', 
-                    style: { textAnchor: 'middle', fontSize: 12 } 
-                  }} 
-                  tick={{ fontSize: 12 }}
-                  width={80}
-                />
-                <Tooltip 
-                  formatter={(value, name) => [`${value}K USD`, name]} 
-                  labelFormatter={(label) => `Mes: ${label}`}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                
-                {/* Product A Lines */}
-                <Line 
-                  type="monotone" 
-                  dataKey="Meta A" 
-                  name="Meta A" 
-                  stroke={colors.primaryDark} 
-                  strokeWidth={2}
-                  strokeDasharray="5 5" 
-                  dot={{ r: 3, fill: colors.primaryDark }} 
-                  activeDot={{ r: 5, fill: colors.primaryDark }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="Real A" 
-                  name="Real A" 
-                  stroke={colors.primary} 
-                  strokeWidth={2} 
-                  dot={{ r: 3, fill: colors.primary }} 
-                  activeDot={{ r: 5, fill: colors.primary }}
-                />
-                
-                {/* Product B Lines */}
-                <Line 
-                  type="monotone" 
-                  dataKey="Meta B" 
-                  name="Meta B" 
-                  stroke={colors.secondaryDark} 
-                  strokeWidth={2}
-                  strokeDasharray="5 5" 
-                  dot={{ r: 3, fill: colors.secondaryDark }} 
-                  activeDot={{ r: 5, fill: colors.secondaryDark }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="Real B" 
-                  name="Real B" 
-                  stroke={colors.secondary} 
-                  strokeWidth={2} 
-                  dot={{ r: 3, fill: colors.secondary }} 
-                  activeDot={{ r: 5, fill: colors.secondary }}
-                />
-                
-                {/* Product C Lines */}
-                <Line 
-                  type="monotone" 
-                  dataKey="Meta C" 
-                  name="Meta C" 
-                  stroke={colors.tertiaryDark} 
-                  strokeWidth={2}
-                  strokeDasharray="5 5" 
-                  dot={{ r: 3, fill: colors.tertiaryDark }} 
-                  activeDot={{ r: 5, fill: colors.tertiaryDark }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="Real C" 
-                  name="Real C" 
-                  stroke={colors.tertiary} 
-                  strokeWidth={2} 
-                  dot={{ r: 3, fill: colors.tertiary }} 
-                  activeDot={{ r: 5, fill: colors.tertiary }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div> 
-
-        {/* Gráfico 2: Desviación porcentual */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          padding: '16px', 
-          borderRadius: '8px', 
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' 
-        }}>
-          <h2 style={{ 
-            fontSize: '20px', 
-            fontWeight: 'bold', 
-            color: '#1f2937', 
-            marginBottom: '4px' 
-          }}>
-            Desviación Porcentual vs Meta
-          </h2>
-          <p style={{ 
-            fontSize: '14px', 
-            color: '#6b7280', 
-            marginBottom: '16px' 
-          }}>
-            Rendimiento mensual por encima/debajo del objetivo
-          </p>
-          <div style={{ width: '100%', height: '400px' }}>
-            <ResponsiveContainer width="100%" height="100%" >
-              <ComposedChart data={dataDesviacion}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis 
-                  label={{ value: '%', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 12 } }}
-                  domain={[-8, 8]}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip formatter={(value) => { 
-                  if (typeof value === 'number') {
-                    return value.toFixed(2) + '%';  
-                  }   
-                  return value;
-                }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                
-                {selectedProducts["Producto A"] && (
-                  <Bar 
-                    dataKey="Producto A" 
-                    name="Producto A" 
-                    fill={colors.primary}
-                    barSize={20}
-                  />
-                )}
-                
-                {selectedProducts["Producto B"] && (
-                  <Bar 
-                    dataKey="Producto B" 
-                    name="Producto B" 
-                    fill={colors.secondary}
-                    barSize={20} 
-                  />
-                )}
-                
-                {selectedProducts["Producto C"] && (
-                  <Bar 
-                    dataKey="Producto C" 
-                    name="Producto C" 
-                    fill={colors.tertiary}
-                    barSize={20} 
-                  />
-                )}
-              </ComposedChart>
-            </ResponsiveContainer>
+                Producto {product}
+              </button>
+            ))}
           </div>
         </div>
+      )}
 
-        {/* Gráfico 3: Resumen Anual por Producto - FIXED */}
+      {/* Charts Grid */}
+      {data.length > 0 && (
         <div style={{ 
-          backgroundColor: 'white', 
-          padding: '16px', 
-          borderRadius: '8px', 
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          gridColumn: '1 / -1'
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', 
+          gap: '32px' 
         }}>
-          <h2 style={{ 
-            fontSize: '20px', 
-            fontWeight: 'bold', 
-            color: '#1f2937', 
-            marginBottom: '4px' 
+          {/* Chart 1: Goals vs Actual Sales */}
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '16px', 
+            borderRadius: '8px', 
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' 
           }}>
-            Desempeño Anual por Producto
-          </h2>
-          <p style={{ 
-            fontSize: '14px', 
-            color: '#6b7280', 
-            marginBottom: '16px' 
-          }}>
-            Comparativa de metas anuales vs ventas acumuladas
-          </p>
-          <div style={{ width: '100%', height: '400px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={filteredResumenProductos}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="producto" tick={{ fontSize: 12 }} />
-                <YAxis 
-                  label={{ value: 'USD (K)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 12 } }}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip 
-                  formatter={(value, name) => {
-                    if (name === "metaTotal") return [`${value}K USD`, "Meta Anual"];
-                    if (name === "ventasTotal") return [`${value}K USD`, "Ventas Anuales"];
-                    if (name === "desviacion") return [`${typeof value === 'number' ? value.toFixed(2) : value}%`, "Desviación"];
-                    return [value, name];
-                  }}
-                />  
-                <Legend 
-                  payload={[
-                    { value: 'Meta Anual', type: 'rect', color: '#8884d8' },
-                    { value: 'Ventas Anuales', type: 'rect', color: '#82ca9d' }
-                  ]}
-                  wrapperStyle={{ fontSize: 12 }}
-                />
-                <Bar dataKey="metaTotal" name="metaTotal" fill="#8884d8" barSize={40} />
-                <Bar dataKey="ventasTotal" name="ventasTotal" fill="#82ca9d" barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* KPIs y Métricas Clave - FIXED */}
-      <div style={{ 
-        marginTop: '32px', 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-        gap: '16px' 
-      }}>
-        {filteredResumenProductos.map((prod) => (
-          <div 
-            key={prod.producto} 
-            style={{
-              backgroundColor: 'white',
-              padding: '16px',
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-              borderLeft: `4px solid ${prod.color}`
-            }}
-          >
-            <h3 style={{ 
-              fontSize: '18px', 
+            <h2 style={{ 
+              fontSize: '20px', 
               fontWeight: 'bold', 
-              color: '#1f2937' 
+              color: '#1f2937', 
+              marginBottom: '4px' 
             }}>
-              {prod.producto}
-            </h3>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '1fr 1fr', 
-              gap: '8px 0', 
-              marginTop: '12px' 
+              Tendencia de Ventas: Meta vs Real
+            </h2>
+            <p style={{ 
+              fontSize: '14px', 
+              color: '#6b7280', 
+              marginBottom: '16px' 
             }}>
-              <div>
-                <p style={{ 
-                  fontSize: '12px', 
-                  color: '#6b7280' 
-                }}>
-                  Meta anual
-                </p>
-                <p style={{ 
-                  fontSize: '18px', 
-                  fontWeight: '600' 
-                }}>
-                  {prod.metaTotal}K USD
-                </p>
-              </div>
-              <div>
-                <p style={{ 
-                  fontSize: '12px', 
-                  color: '#6b7280' 
-                }}>
-                  Ventas reales
-                </p>
-                <p style={{ 
-                  fontSize: '18px', 
-                  fontWeight: '600' 
-                }}>
-                  {prod.ventasTotal}K USD
-                </p>
-              </div>
-              <div>
-                <p style={{ 
-                  fontSize: '12px', 
-                  color: '#6b7280' 
-                }}>
-                  Desviación
-                </p>
-                <p style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: prod.desviacion >= 0 ? '#059669' : '#dc2626'
-                }}>
-                  {prod.desviacion.toFixed(2)}%
-                </p>
-              </div>
-              <div>
-                <p style={{ 
-                  fontSize: '12px', 
-                  color: '#6b7280' 
-                }}>
-                  Meses positivos
-                </p>
-                <p style={{ 
-                  fontSize: '18px', 
-                  fontWeight: '600' 
-                }}>
-                  {prod.mesesPositivos} / {prod.totalMeses}
-                </p>
-              </div>
+              Comparativa mensual de objetivos y resultados
+            </p>
+            <div style={{ width: '100%', height: '400px', minHeight: '400px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart 
+                  data={data} 
+                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="mes" 
+                    tick={{ fontSize: 12 }} 
+                    height={60}
+                  />
+                  <YAxis 
+                    label={{ 
+                      value: 'USD (K)', 
+                      angle: -90, 
+                      position: 'insideLeft', 
+                      style: { textAnchor: 'middle', fontSize: 12 } 
+                    }} 
+                    tick={{ fontSize: 12 }}
+                    width={80}
+                  />
+                  <Tooltip 
+                    formatter={(value, name) => [`${value}K USD`, name]} 
+                    labelFormatter={(label) => `Mes: ${label}`}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  
+                  {/* Dynamic Product Lines */}
+                  {products.map((product, index) => {
+                    if (!selectedProducts[`Producto ${product}`]) return null;
+                    
+                    const color = getColor(index);
+                    const darkColor = color; // Using same color but could be darker
+                    
+                    return (
+                      <React.Fragment key={product}>
+                        <Line 
+                          type="monotone" 
+                          dataKey={`Meta ${product}`} 
+                          name={`Meta ${product}`} 
+                          stroke={darkColor} 
+                          strokeWidth={2}
+                          strokeDasharray="5 5" 
+                          dot={{ r: 3, fill: darkColor }} 
+                          activeDot={{ r: 5, fill: darkColor }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey={`Real ${product}`} 
+                          name={`Real ${product}`} 
+                          stroke={color} 
+                          strokeWidth={2} 
+                          dot={{ r: 3, fill: color }} 
+                          activeDot={{ r: 5, fill: color }}
+                        />
+                      </React.Fragment>
+                    );
+                  })}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div> 
+
+          {/* Chart 2: Percentage Deviation */}
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '16px', 
+            borderRadius: '8px', 
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' 
+          }}>
+            <h2 style={{ 
+              fontSize: '20px', 
+              fontWeight: 'bold', 
+              color: '#1f2937', 
+              marginBottom: '4px' 
+            }}>
+              Desviación Porcentual vs Meta
+            </h2>
+            <p style={{ 
+              fontSize: '14px', 
+              color: '#6b7280', 
+              marginBottom: '16px' 
+            }}>
+              Rendimiento mensual por encima/debajo del objetivo
+            </p>
+            <div style={{ width: '100%', height: '400px' }}>
+              <ResponsiveContainer width="100%" height="100%" >
+                <ComposedChart data={dataDesviacion}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+                  <YAxis 
+                    label={{ value: '%', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 12 } }}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip formatter={(value) => { 
+                    if (typeof value === 'number') {
+                      return value.toFixed(2) + '%';  
+                    }   
+                    return value;
+                  }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  
+                  {products.map((product, index) => {
+                    if (!selectedProducts[`Producto ${product}`]) return null;
+                    
+                    return (
+                      <Bar 
+                        key={product}
+                        dataKey={`Producto ${product}`} 
+                        name={`Producto ${product}`} 
+                        fill={getColor(index)}
+                        barSize={Math.max(15, Math.min(30, 300 / products.length))}
+                      />
+                    );
+                  })}
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
           </div>
-        ))}
-      </div>
+
+          {/* Chart 3: Annual Summary by Product */}
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '16px', 
+            borderRadius: '8px', 
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+            gridColumn: '1 / -1'
+          }}>
+            <h2 style={{ 
+              fontSize: '20px', 
+              fontWeight: 'bold', 
+              color: '#1f2937', 
+              marginBottom: '4px' 
+            }}>
+              Desempeño Anual por Producto
+            </h2>
+            <p style={{ 
+              fontSize: '14px', 
+              color: '#6b7280', 
+              marginBottom: '16px' 
+            }}>
+              Comparativa de metas anuales vs ventas acumuladas
+            </p>
+            <div style={{ width: '100%', height: '400px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={filteredResumenProductos}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="producto" tick={{ fontSize: 12 }} />
+                  <YAxis 
+                    label={{ value: 'USD (K)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 12 } }}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    formatter={(value, name) => {
+                      if (name === "metaTotal") return [`${value}K USD`, "Meta Anual"];
+                      if (name === "ventasTotal") return [`${value}K USD`, "Ventas Anuales"];
+                      if (name === "desviacion") return [`${typeof value === 'number' ? value.toFixed(2) : value}%`, "Desviación"];
+                      return [value, name];
+                    }}
+                  />  
+                  <Legend 
+                    payload={[
+                      { value: 'Meta Anual', type: 'rect', color: '#8884d8' },
+                      { value: 'Ventas Anuales', type: 'rect', color: '#82ca9d' }
+                    ]}
+                    wrapperStyle={{ fontSize: 12 }}
+                  />
+                  <Bar dataKey="metaTotal" name="metaTotal" fill="#8884d8" barSize={Math.max(30, Math.min(60, 500 / filteredResumenProductos.length))} />
+                  <Bar dataKey="ventasTotal" name="ventasTotal" fill="#82ca9d" barSize={Math.max(30, Math.min(60, 500 / filteredResumenProductos.length))} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KPIs and Key Metrics */}
+      {filteredResumenProductos.length > 0 && (
+        <div style={{ 
+          marginTop: '32px', 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+          gap: '16px' 
+        }}>
+          {filteredResumenProductos.map((prod) => (
+            <div 
+              key={prod.producto} 
+              style={{
+                backgroundColor: 'white',
+                padding: '16px',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                borderLeft: `4px solid ${prod.color}`
+              }}
+            >
+              <h3 style={{ 
+                fontSize: '18px', 
+                fontWeight: 'bold', 
+                color: '#1f2937' 
+              }}>
+                {prod.producto}
+              </h3>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '8px 0', 
+                marginTop: '12px' 
+              }}>
+                <div>
+                  <p style={{ 
+                    fontSize: '12px', 
+                    color: '#6b7280' 
+                  }}>
+                    Meta anual
+                  </p>
+                  <p style={{ 
+                    fontSize: '18px', 
+                    fontWeight: '600' 
+                  }}>
+                    {prod.metaTotal}K USD
+                  </p>
+                </div>
+                <div>
+                  <p style={{ 
+                    fontSize: '12px', 
+                    color: '#6b7280' 
+                  }}>
+                    Ventas reales
+                  </p>
+                  <p style={{ 
+                    fontSize: '18px', 
+                    fontWeight: '600' 
+                  }}>
+                    {prod.ventasTotal}K USD
+                  </p>
+                </div>
+                <div>
+                  <p style={{ 
+                    fontSize: '12px', 
+                    color: '#6b7280' 
+                  }}>
+                    Desviación
+                  </p>
+                  <p style={{
+                    fontSize: '18px',
+                    fontWeight: '600',
+                    color: prod.desviacion >= 0 ? '#059669' : '#dc2626'
+                  }}>
+                    {prod.desviacion.toFixed(2)}%
+                  </p>
+                </div>
+                <div>
+                  <p style={{ 
+                    fontSize: '12px', 
+                    color: '#6b7280' 
+                  }}>
+                    Meses positivos
+                  </p>
+                  <p style={{ 
+                    fontSize: '18px', 
+                    fontWeight: '600' 
+                  }}>
+                    {prod.mesesPositivos} / {prod.totalMeses}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Instructions when no data */}
+      {data.length === 0 && (
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '32px', 
+          borderRadius: '8px', 
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          textAlign: 'center' 
+        }}>
+          <h3 style={{ 
+            fontSize: '18px', 
+            fontWeight: 'bold', 
+            color: '#1f2937', 
+            marginBottom: '8px' 
+          }}>
+            Sube un archivo Excel para comenzar
+          </h3>
+          <p style={{ 
+            fontSize: '14px', 
+            color: '#6b7280' 
+          }}>
+            El archivo debe contener columnas con formato: 'mes', 'Meta [Producto]', 'Real [Producto]' para cada producto.
+            <br />
+            Ejemplo: mes, Meta A, Real A, Meta B, Real B, etc.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
