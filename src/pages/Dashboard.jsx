@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LineChart, BarChart, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import * as XLSX from "xlsx";
 import React from "react";
@@ -9,6 +9,9 @@ function ProductDashboard() {
   const [products, setProducts] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState({});
   const [resumenProductos, setResumenProductos] = useState([]);
+  const [dataDesviacion, setDataDesviacion] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
 
   const colors = {
     palette: [
@@ -109,6 +112,35 @@ function ProductDashboard() {
     });
   };
 
+  // Process data when products or data changes
+  useEffect(() => {
+    if (data.length > 0 && products.length > 0) {
+      setIsLoading(true);
+      
+      // Simulate processing time for better UX
+      setTimeout(() => {
+        try {
+          const registrosTransformados = transformarDatos(data, products);
+          const resumen = calcularResumenProductos(registrosTransformados, products);
+          const desviaciones = calculateDeviations(data, products);
+          
+          setResumenProductos(resumen);
+          setDataDesviacion(desviaciones);
+          setDataReady(true);
+        } catch (error) {
+          console.error("Error processing data:", error);
+          alert("Error al procesar los datos.");
+        } finally {
+          setIsLoading(false);
+        }
+      }, 500);
+    } else {
+      setDataReady(false);
+      setResumenProductos([]);
+      setDataDesviacion([]);
+    }
+  }, [data, products]);
+
   const handleProductToggle = (product) => {
     setSelectedProducts({
       ...selectedProducts,
@@ -119,6 +151,9 @@ function ProductDashboard() {
   const handleFileUpload = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    setIsLoading(true);
+    setDataReady(false);
 
     const reader = new FileReader();
 
@@ -132,14 +167,15 @@ function ProductDashboard() {
         
         if (jsonData.length === 0) {
           alert("El archivo Excel está vacío.");
+          setIsLoading(false);
           return;
         }
-
 
         const detectedProducts = extractProductsFromData(jsonData);
         
         if (detectedProducts.length === 0) {
           alert("No se encontraron productos válidos. Asegúrate de que las columnas sigan el formato 'Meta [Producto]' y 'Real [Producto]'.");
+          setIsLoading(false);
           return;
         }
 
@@ -152,11 +188,13 @@ function ProductDashboard() {
 
         if (missingColumns.length > 0) {
           alert(`Faltan las siguientes columnas en el archivo Excel: ${missingColumns.join(', ')}`);
+          setIsLoading(false);
           return;
         }
 
         if (!('mes' in firstRow)) {
           alert("Falta la columna 'mes' en el archivo Excel.");
+          setIsLoading(false);
           return;
         }
 
@@ -171,28 +209,63 @@ function ProductDashboard() {
         });
         setSelectedProducts(initialSelection);
 
-        const registrosTransformados = transformarDatos(jsonData, detectedProducts);
-        const resumen = calcularResumenProductos(registrosTransformados, detectedProducts);
-        setResumenProductos(resumen);
-
       } catch (error) {
         console.error("Error processing file:", error);
         alert("Error al procesar el archivo. Asegúrate de que sea un archivo Excel válido con la estructura correcta.");
+        setIsLoading(false);
       }
     };
 
     reader.readAsArrayBuffer(file);
   };
 
-  // Calculate deviations from current data and products
-  const dataDesviacion = data.length > 0 && products.length > 0 
-    ? calculateDeviations(data, products)
-    : [];
-
   // Filter resumenProductos based on selected products
   const filteredResumenProductos = resumenProductos.filter(p => 
     selectedProducts[p.producto]
   );
+
+  // Generate Lines for the chart
+  const generateLines = () => {
+    const lines = [];
+    
+    products.forEach((product, index) => {
+      if (!selectedProducts[`Producto ${product}`]) return;
+      
+      const color = getColor(index);
+      const darkColor = color;
+      
+      // Meta line (dashed)
+      lines.push(
+        <Line 
+          key={`meta-${product}`}
+          type="monotone" 
+          dataKey={`Meta ${product}`} 
+          name={`Meta ${product}`} 
+          stroke={darkColor} 
+          strokeWidth={2}
+          strokeDasharray="5 5" 
+          dot={{ r: 3, fill: darkColor }} 
+          activeDot={{ r: 5, fill: darkColor }}
+        />
+      );
+      
+      // Real line (solid)
+      lines.push(
+        <Line 
+          key={`real-${product}`}
+          type="monotone" 
+          dataKey={`Real ${product}`} 
+          name={`Real ${product}`} 
+          stroke={color} 
+          strokeWidth={2} 
+          dot={{ r: 3, fill: color }} 
+          activeDot={{ r: 5, fill: color }}
+        />
+      );
+    });
+    
+    return lines;
+  };
 
   return (
     <div style={{ 
@@ -234,15 +307,16 @@ function ProductDashboard() {
           type="file" 
           accept=".xlsx, .xls" 
           onChange={handleFileUpload}
+          disabled={isLoading}
           style={{
             display: 'block',
             width: '100%',
             fontSize: '14px',
-            color: '#111827',
+            color: isLoading ? '#9ca3af' : '#111827',
             border: '1px solid #d1d5db',
             borderRadius: '8px',
-            cursor: 'pointer',
-            backgroundColor: 'white',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            backgroundColor: isLoading ? '#f3f4f6' : 'white',
             padding: '8px 12px'
           }}
         />
@@ -257,8 +331,44 @@ function ProductDashboard() {
         )}
       </div>
 
+      {/* Loading Indicator */}
+      {isLoading && (
+        <div style={{
+          backgroundColor: 'white',
+          padding: '32px',
+          borderRadius: '8px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          textAlign: 'center',
+          marginBottom: '24px'
+        }}>
+          <div style={{
+            display: 'inline-block',
+            width: '32px',
+            height: '32px',
+            border: '3px solid #f3f4f6',
+            borderTop: '3px solid #3498db',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            marginBottom: '16px'
+          }} />
+          <p style={{
+            fontSize: '16px',
+            color: '#4b5563',
+            fontWeight: '500'
+          }}>
+            Procesando datos...
+          </p>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      )}
+
       {/* Product Filters */}
-      {products.length > 0 && (
+      {products.length > 0 && dataReady && !isLoading && (
         <div style={{ 
           marginBottom: '24px', 
           display: 'flex', 
@@ -295,7 +405,7 @@ function ProductDashboard() {
       )}
 
       {/* Charts Grid */}
-      {data.length > 0 && (
+      {dataReady && !isLoading && data.length > 0 && (
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', 
@@ -352,36 +462,7 @@ function ProductDashboard() {
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   
                   {/* Dynamic Product Lines */}
-                  {products.map((product, index) => {
-                    if (!selectedProducts[`Producto ${product}`]) return null;
-                    
-                    const color = getColor(index);
-                    const darkColor = color; // Using same color but could be darker
-                    
-                    return (
-                      <React.Fragment key={product}>
-                        <Line 
-                          type="monotone" 
-                          dataKey={`Meta ${product}`} 
-                          name={`Meta ${product}`} 
-                          stroke={darkColor} 
-                          strokeWidth={2}
-                          strokeDasharray="5 5" 
-                          dot={{ r: 3, fill: darkColor }} 
-                          activeDot={{ r: 5, fill: darkColor }}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey={`Real ${product}`} 
-                          name={`Real ${product}`} 
-                          stroke={color} 
-                          strokeWidth={2} 
-                          dot={{ r: 3, fill: color }} 
-                          activeDot={{ r: 5, fill: color }}
-                        />
-                      </React.Fragment>
-                    );
-                  })}
+                  {generateLines()}
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -501,7 +582,7 @@ function ProductDashboard() {
       )}
 
       {/* KPIs and Key Metrics */}
-      {filteredResumenProductos.length > 0 && (
+      {dataReady && !isLoading && filteredResumenProductos.length > 0 && (
         <div style={{ 
           marginTop: '32px', 
           display: 'grid', 
@@ -596,7 +677,7 @@ function ProductDashboard() {
       )}
 
       {/* Instructions when no data */}
-      {data.length === 0 && (
+      {!isLoading && data.length === 0 && (
         <div style={{ 
           backgroundColor: 'white', 
           padding: '32px', 
